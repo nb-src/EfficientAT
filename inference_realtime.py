@@ -70,8 +70,6 @@ parser.add_argument(
 args = parser.parse_args(remaining)
 q = queue.Queue()
 
-dev_sr = int(sd.query_devices(device=args.device, kind="input")["default_samplerate"])
-
 
 def audio_callback(indata, frames, time, status):
     """This is called (from a separate thread) for each audio block."""
@@ -135,8 +133,12 @@ model.to(device)
 model.eval()
 
 
-def main():
+def main(device_id):
+    args.device = device_id
     try:
+        dev_sr = int(
+            sd.query_devices(device=args.device, kind="input")["default_samplerate"]
+        )
         if dev_sr == SAMPLE_RATE:
             stream = sd.InputStream(
                 device=args.device,
