@@ -107,10 +107,11 @@ def audio_tagging(waveform):
     sorted_indexes = np.argsort(preds)[::-1]
 
     # Print audio tagging top probabilities
-    print("************* Acoustic Event Detected: *****************")
-    for k in range(10):
-        print(f"{labels[sorted_indexes[k]]}: {preds[sorted_indexes[k]]:.3f}")
-    print("********************************************************")
+    # print("************* Acoustic Event Detected: *****************")
+    # for k in range(10):
+    #     print(f"{labels[sorted_indexes[k]]}: {preds[sorted_indexes[k]]:.3f}")
+    # print("********************************************************")
+    return sorted_indexes[:10]
 
 
 # load pre-trained model
@@ -134,54 +135,56 @@ model.to(device)
 model.eval()
 
 
-try:
-    if dev_sr == SAMPLE_RATE:
-        stream = sd.InputStream(
-            device=args.device,
-            channels=1,
-            samplerate=SAMPLE_RATE,
-            blocksize=int(SAMPLE_RATE * SEGMENT_SIZE),
-            dtype="float32",
-            callback=audio_callback,
-        )
-    else:
-        resampler = T.Resample(
-            orig_freq=48000,
-            new_freq=32000,
-            lowpass_filter_width=6,
-        ).to(device)
-        stream = sd.InputStream(
-            device=args.device,
-            channels=1,
-            blocksize=int(dev_sr * SEGMENT_SIZE),
-            dtype="float32",
-            callback=audio_callback,
-        )
-    d = deque(maxlen=WINDOW_SIZE)
-    with stream:
-        while True:
-            new_block = q.get()
-            waveform = torch.from_numpy(new_block[None, :]).to(device)
-            if SAMPLE_RATE != dev_sr:
-                with torch.no_grad():
-                    waveform = resampler(waveform)
-            d.append(waveform)
-
-            while True:  # always empty queue
-                try:
-                    new_block = q.get_nowait()
-                except queue.Empty:
-                    break
+def main():
+    try:
+        if dev_sr == SAMPLE_RATE:
+            stream = sd.InputStream(
+                device=args.device,
+                channels=1,
+                samplerate=SAMPLE_RATE,
+                blocksize=int(SAMPLE_RATE * SEGMENT_SIZE),
+                dtype="float32",
+                callback=audio_callback,
+            )
+        else:
+            resampler = T.Resample(
+                orig_freq=48000,
+                new_freq=32000,
+                lowpass_filter_width=6,
+            ).to(device)
+            stream = sd.InputStream(
+                device=args.device,
+                channels=1,
+                blocksize=int(dev_sr * SEGMENT_SIZE),
+                dtype="float32",
+                callback=audio_callback,
+            )
+        d = deque(maxlen=WINDOW_SIZE)
+        with stream:
+            while True:
+                new_block = q.get()
                 waveform = torch.from_numpy(new_block[None, :]).to(device)
-
                 if SAMPLE_RATE != dev_sr:
                     with torch.no_grad():
                         waveform = resampler(waveform)
                 d.append(waveform)
-            audio_window = torch.cat(list(d), dim=1)
-            t0 = time.perf_counter()
-            audio_tagging(audio_window)
-            print(f"Inference time: {(time.perf_counter() - t0) * 1000:.1f} ms")
 
-except Exception as e:
-    parser.exit(1, type(e).__name__ + ": " + str(e))
+                while True:  # always empty queue
+                    try:
+                        new_block = q.get_nowait()
+                    except queue.Empty:
+                        break
+                    waveform = torch.from_numpy(new_block[None, :]).to(device)
+
+                    if SAMPLE_RATE != dev_sr:
+                        with torch.no_grad():
+                            waveform = resampler(waveform)
+                    d.append(waveform)
+                audio_window = torch.cat(list(d), dim=1)
+                t0 = time.perf_counter()
+                top_10_classes = audio_tagging(audio_window)
+                # print(f"Inference time: {(time.perf_counter() - t0) * 1000:.1f} ms")
+                yield top_10_classes
+
+    except Exception as e:
+        parser.exit(1, type(e).__name__ + ": " + str(e))
