@@ -102,14 +102,14 @@ def audio_tagging(waveform):
         preds, _features = model(spec.unsqueeze(0))
     preds = torch.sigmoid(preds.float()).squeeze().cpu().numpy()
 
-    sorted_indexes = np.argsort(preds)[::-1]
+    # sorted_indexes = np.argsort(preds)[::-1]
 
     # Print audio tagging top probabilities
     # print("************* Acoustic Event Detected: *****************")
     # for k in range(10):
     #     print(f"{labels[sorted_indexes[k]]}: {preds[sorted_indexes[k]]:.3f}")
     # print("********************************************************")
-    return sorted_indexes[:10]
+    return preds
 
 
 # load pre-trained model
@@ -184,9 +184,9 @@ def main(device_id):
                     d.append(waveform)
                 audio_window = torch.cat(list(d), dim=1)
                 t0 = time.perf_counter()
-                top_10_classes = audio_tagging(audio_window)
+                preds = audio_tagging(audio_window)
                 # print(f"Inference time: {(time.perf_counter() - t0) * 1000:.1f} ms")
-                yield top_10_classes
+                yield preds
 
     except Exception as e:
         parser.exit(1, type(e).__name__ + ": " + str(e))
