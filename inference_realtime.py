@@ -102,13 +102,6 @@ def audio_tagging(waveform):
         preds, _features = model(spec.unsqueeze(0))
     preds = torch.sigmoid(preds.float()).squeeze().cpu().numpy()
 
-    # sorted_indexes = np.argsort(preds)[::-1]
-
-    # Print audio tagging top probabilities
-    # print("************* Acoustic Event Detected: *****************")
-    # for k in range(10):
-    #     print(f"{labels[sorted_indexes[k]]}: {preds[sorted_indexes[k]]:.3f}")
-    # print("********************************************************")
     return preds
 
 
@@ -190,3 +183,14 @@ def main(device_id):
 
     except Exception as e:
         parser.exit(1, type(e).__name__ + ": " + str(e))
+
+
+if __name__ == "__main__":
+    for preds in main(device_id=None):
+        sorted_indexes = np.argsort(preds)[::-1]
+
+        # Print audio tagging top probabilities
+        print("************* Acoustic Event Detected: *****************")
+        for k in range(10):
+            print(f"{labels[sorted_indexes[k]]}: {preds[sorted_indexes[k]]:.3f}")
+        print("********************************************************")
